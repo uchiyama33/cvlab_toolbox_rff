@@ -39,7 +39,7 @@ class ConstrainedMSM(MSMInterface, ConstrainedSMBase):
         return gramians
 
 
-class CMSMrff(MSMInterface, ConstrainedSMBase):
+class rffCMSM(MSMInterface, ConstrainedSMBase):
     """
     Mutual Subspace Method
     """

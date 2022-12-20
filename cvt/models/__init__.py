@@ -1,5 +1,5 @@
-from .cmsm import CMSMrff, ConstrainedMSM
+from .cmsm import ConstrainedMSM, rffCMSM
 from .kcmsm import KernelCMSM
 from .kmsm import KernelMSM
-from .msm import MSMrff, MutualSubspaceMethod
+from .msm import MutualSubspaceMethod, rffMSM
 from .sm import SubspaceMethod

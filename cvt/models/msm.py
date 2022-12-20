@@ -38,7 +38,7 @@ class MutualSubspaceMethod(MSMInterface, SMBase):
         return gramians
 
 
-class MSMrff(MSMInterface, SMBase):
+class rffMSM(MSMInterface, SMBase):
     """
     Mutual Subspace Method
     """
