@@ -4,23 +4,25 @@ Subspace Method Interface
 
 # Authors: Junki Ishikawa
 import itertools
-from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.model_selection import KFold, StratifiedKFold
-from sklearn.preprocessing import normalize as _normalize, LabelEncoder
+
 import numpy as np
 from scipy.linalg import block_diag
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import normalize as _normalize
 
-from cvt.utils import subspace_bases
-from cvt.utils import rbf_kernel, dual_vectors, mean_square_singular_values
+from ..utils import dual_vectors, mean_square_singular_values, rbf_kernel, subspace_bases
 
 
 class SMBase(BaseEstimator, ClassifierMixin):
     """
     Base class of Subspace Method
     """
-    param_names = {'normalize', 'n_subdims'}
 
-    def __init__(self, n_subdims, normalize=False, faster_mode=False):
+    param_names = {"normalize", "n_subdims"}
+
+    def __init__(self, n_subdims, normalize=False, faster_mode=False, test_n_subdims=None):
         """
         Parameters
         ----------
@@ -37,7 +39,7 @@ class SMBase(BaseEstimator, ClassifierMixin):
         self.dic = None
         self.labels = None
         self.n_classes = None
-        self._test_n_subdims = None
+        self._test_n_subdims = test_n_subdims
         self.params = ()
 
     def get_params(self, deep=True):
@@ -92,7 +94,10 @@ class SMBase(BaseEstimator, ClassifierMixin):
             n_dims is number of dimentions of vectors.
 
         y: integer array, (n_classes)
-            Class labels of training vectors. 
+            Class labels of training vectors.
+            e.g.
+                y =  np.unique(labels).astype(int)
+                y = range(len(X))
         """
 
         # preprocessing data matricies
@@ -130,16 +135,20 @@ class SMBase(BaseEstimator, ClassifierMixin):
             Prediction array
 
         """
-        
-        if self.faster_mode and hasattr(self, 'fast_predict_proba'):
+
+        if self.faster_mode and hasattr(self, "fast_predict_proba"):
             proba = self.fast_predict_proba(X)
         else:
             proba = self.predict_proba(X)
 
         salt = 1e-3
-        assert proba.min() > 0.0 - salt, 'some probabilities are smaller than 0! min value is {}'.format(proba.min())
-        assert proba.max() < 1.0 + salt, 'some probabilities are bigger than 1! max value is {}'.format(proba.max())
-        proba = np.clip(proba, 0, 1)
+        assert proba.min() > 0.0 - salt, "some probabilities are smaller than 0! min value is {}".format(
+            proba.min()
+        )
+        assert proba.max() < 1.0 + salt, "some probabilities are bigger than 1! max value is {}".format(
+            proba.max()
+        )
+        proba = np.clip(proba, 0, 1)  # @ajs 上のおかげでひっかかることなくね？
         return self.proba2class(proba)
 
     def proba2class(self, proba):
@@ -173,16 +182,17 @@ class SMBase(BaseEstimator, ClassifierMixin):
         ----------
         X: arrays, (n_dims, n_samples)
         """
-        raise NotImplementedError('_predict is not implemented')
+        raise NotImplementedError("_predict is not implemented")
 
 
 class KernelSMBase(SMBase):
     """
     Base class of Kernel Subspace Method
     """
-    param_names = {'normalize', 'n_subdims', 'sigma'}
 
-    def __init__(self, n_subdims, normalize=False, sigma=None, faster_mode=False):
+    param_names = {"normalize", "n_subdims", "sigma"}
+
+    def __init__(self, n_subdims, normalize=False, sigma=None, faster_mode=False, test_n_subdims=None):
         """
         Parameters
         ----------
@@ -195,7 +205,7 @@ class KernelSMBase(SMBase):
         sigma : int or str, optional (default=None)
             a parameter of rbf kernel. if sigma is None, sqrt(n_dims / 2) will be used.
         """
-        super(KernelSMBase, self).__init__(n_subdims, normalize, faster_mode)
+        super(KernelSMBase, self).__init__(n_subdims, normalize, faster_mode, test_n_subdims)
         self.sigma = sigma
 
     def _fit(self, X, y):
@@ -218,7 +228,8 @@ class ConstrainedSMBase(SMBase):
     """
     Base class of Constrained Subspace Method
     """
-    param_names = {'normalize', 'n_subdims', 'n_gds_dims'}
+
+    param_names = {"normalize", "n_subdims", "n_gds_dims"}
 
     def __init__(self, n_subdims, n_gds_dims, normalize=False):
         """
@@ -253,7 +264,7 @@ class ConstrainedSMBase(SMBase):
 
         # bases_proj, (n_gds_dims, n_subdims)
         bases_proj = np.matmul(self.gds.T, bases)
-        qr = np.vectorize(np.linalg.qr, signature='(n,m)->(n,m),(m,m)')
+        qr = np.vectorize(np.linalg.qr, signature="(n,m)->(n,m),(m,m)")
         bases, _ = qr(bases_proj)
         return bases
 
@@ -288,7 +299,8 @@ class KernelCSMBase(SMBase):
     """
     Base class of Kernel Constrained Subspace Method
     """
-    param_names = {'normalize', 'n_subdims', 'sigma', 'n_gds_dims'}
+
+    param_names = {"normalize", "n_subdims", "sigma", "n_gds_dims"}
 
     def __init__(self, n_subdims, n_gds_dims, normalize=False, sigma=None):
         """
@@ -318,10 +330,7 @@ class KernelCSMBase(SMBase):
         """
 
         # mapings, (n_classes * n_samples)
-        mappings = np.array([
-            i for i, _X in enumerate(X)
-            for _ in range(_X.shape[1])
-        ])
+        mappings = np.array([i for i, _X in enumerate(X) for _ in range(_X.shape[1])])
 
         # stack_X, (n_dims, n_classes * n_samples)
         stack_X = np.hstack(X)
@@ -331,7 +340,7 @@ class KernelCSMBase(SMBase):
 
         coeff = []
         for i, _ in enumerate(X):
-            p = (mappings == i)
+            p = mappings == i
             # clipping K(X[y==c], X[y==c])
             # _K, (n_samples_i, n_samples_i)
             _K = K[p][:, p]
@@ -374,6 +383,7 @@ class KernelCSMBase(SMBase):
         self.mappings = mappings
         self.gds_coeff = gds_coeff
         self.dic = dic
+
 
 class MSMInterface(object):
     """
@@ -422,19 +432,19 @@ class MSMInterface(object):
         G: array, (n_class, n_subdims, n_subdims)
             gramian matricies of references of each class
         """
-        raise NotImplementedError('_get_gramians is not implemented')
-        
+        raise NotImplementedError("_get_gramians is not implemented")
+
     @property
     def test_n_subdims(self):
         if self._test_n_subdims is None:
             return self.n_subdims
         return self._test_n_subdims
-    
+
     @test_n_subdims.setter
     def test_n_subdims(self, v):
         assert isinstance(v, int)
         self._test_n_subdims = v
-        
+
     @test_n_subdims.deleter
     def test_n_subdims(self):
         self._test_n_subdims = None
