@@ -10,6 +10,7 @@ from numpy.random import randint, rand
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from cvt.models import KernelMSM
+from cvt.models import KernelMSM
 
 dim = 100
 n_class = 4
@@ -31,6 +32,14 @@ pred = model.predict(X_test)
 
 print(accuracy_score(pred, y_test))
 
+# rff approximation
+model = rffMSM(n_subdims=3, sigma=0.01, m_rand_samples=1000)
+# fit
+model.fit(X_train, y_train)
+# predict
+pred = model.predict(X_test)
+
+print(accuracy_score(pred, y_test))
 ```
 
 ## Install
