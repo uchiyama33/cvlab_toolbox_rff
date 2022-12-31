@@ -108,7 +108,6 @@ class rffCMSM(MSMInterface, ConstrainedSMBase):
                 _newX.append(self.z(_X, self.w[n], self.b[n], self.m))
             _newX = np.stack(_newX, axis=0).mean(axis=0)
             newX.append(_newX)
-        newX = np.array(newX)
 
         dic = [subspace_bases(_X, self.n_subdims) for _X in newX]
         # dic,  (n_classes, n_dims, n_subdims)
